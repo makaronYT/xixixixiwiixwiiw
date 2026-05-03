@@ -1,51 +1,65 @@
 <!DOCTYPE html>
 <html>
-<head>
-<style>
-body {
-  margin: 0;
-  background: transparent;
-  font-family: Arial;
-}
+<body style="margin:0;background:transparent;overflow:hidden;font-family:sans-serif;">
 
-#alert {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%,-50%);
-  background: rgba(0,0,0,0.7);
-  padding: 20px;
-  border-radius: 15px;
-  color: white;
-  font-size: 40px;
-  display: none;
-}
-</style>
-</head>
-<body>
+<div id="alert" style="
+position:absolute;
+top:50%; left:50%;
+transform:translate(-50%,-50%) scale(0.8);
+text-align:center;
+opacity:0;
+transition: all 0.4s ease;
+">
 
-<div id="alert"></div>
+<img id="gif" style="width:300px;"><br>
+
+<div id="text" style="
+font-size:40px;
+font-weight:bold;
+text-shadow: 0 0 20px black;
+"></div>
+
+</div>
+
+<audio id="sound"></audio>
 
 <script>
-async function loadAlert() {
+let last = "";
+
+async function load() {
     const res = await fetch("/data");
     const data = await res.json();
 
-    if (!data || !data.player) return;
+    if (!data.player) return;
+
+    const id = JSON.stringify(data);
+    if (id === last) return;
+    last = id;
 
     const box = document.getElementById("alert");
 
-    box.innerText =
-        data.player + " bought " + data.item + " for " + data.price + " PLN";
+    document.getElementById("gif").src = data.gif;
+    document.getElementById("text").innerText =
+        `${data.player} donated ${data.price} PLN!`;
 
-    box.style.display = "block";
+    document.getElementById("text").style.color = data.color;
+
+    if (data.sound) {
+        const audio = document.getElementById("sound");
+        audio.src = data.sound;
+        audio.play();
+    }
+
+    box.style.opacity = "1";
+    box.style.transform = "translate(-50%,-50%) scale(1)";
 
     setTimeout(() => {
-        box.style.display = "none";
-    }, 5000);
+        box.style.opacity = "0";
+        box.style.transform = "translate(-50%,-50%) scale(0.8)";
+    }, 6000);
 }
 
-setInterval(loadAlert, 1500);
+setInterval(load, 1000);
 </script>
 
 </body>
