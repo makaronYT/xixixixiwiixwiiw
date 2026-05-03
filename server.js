@@ -9,17 +9,16 @@ let latestAlert = null;
 
 // receive data from Make.com
 app.post("/webhook", (req, res) => {
-    latestAlert = req.body;
-    console.log("New alert:", latestAlert);
+    const data = req.body;
+
+    // extract real Tip4Serv data
+    latestAlert = {
+        player: data.data.user.username,
+        item: data.data.basket[0].name,
+        price: data.data.amount.total_paid
+    };
+
+    console.log("Processed alert:", latestAlert);
+
     res.sendStatus(200);
-});
-
-// OBS reads this
-app.get("/alert", (req, res) => {
-    res.json(latestAlert || {});
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log("Server running on port " + PORT);
 });
