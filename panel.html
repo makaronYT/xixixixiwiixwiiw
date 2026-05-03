@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family:sans-serif;padding:20px;">
+
+<h2>Donation Settings</h2>
+
+<textarea id="json" style="width:100%;height:300px;"></textarea><br><br>
+
+<button onclick="save()">Save</button>
+
+<script>
+async function load() {
+    const res = await fetch("/settings");
+    const data = await res.json();
+    document.getElementById("json").value = JSON.stringify(data, null, 2);
+}
+
+async function save() {
+    const val = JSON.parse(document.getElementById("json").value);
+
+    await fetch("/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(val)
+    });
+
+    alert("Saved!");
+}
+
+load();
+</script>
+
+</body>
+</html>
