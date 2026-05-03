@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body {
+  margin: 0;
+  background: transparent;
+  font-family: Arial;
+}
+
+#alert {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  background: rgba(0,0,0,0.7);
+  padding: 20px;
+  border-radius: 15px;
+  color: white;
+  font-size: 40px;
+  display: none;
+}
+</style>
+</head>
+<body>
+
+<div id="alert"></div>
+
+<script>
+async function loadAlert() {
+    const res = await fetch("/data");
+    const data = await res.json();
+
+    if (!data || !data.player) return;
+
+    const box = document.getElementById("alert");
+
+    box.innerText =
+        data.player + " bought " + data.item + " for " + data.price + " PLN";
+
+    box.style.display = "block";
+
+    setTimeout(() => {
+        box.style.display = "none";
+    }, 5000);
+}
+
+setInterval(loadAlert, 1500);
+</script>
+
+</body>
+</html>
