@@ -1,68 +1,66 @@
 const express = require("express");
-
 const app = express();
+
 app.use(express.json());
 
 let latestAlert = null;
 
-// webhook from Tip4Serv
+// 🔧 SETTINGS (editable via panel)
+let settings = {
+    tiers: [
+        { min: 0, gif: "https://i.imgur.com/1.gif", sound: "", color: "#ffffff" },
+        { min: 50, gif: "https://i.imgur.com/2.gif", sound: "https://example.com/sound1.mp3", color: "#00ffcc" },
+        { min: 100, gif: "https://i.imgur.com/3.gif", sound: "https://example.com/sound2.mp3", color: "#ffcc00" }
+    ]
+};
+
+// webhook
 app.post("/webhook", (req, res) => {
-    try {
-        const data = req.body;
+    const d = req.body?.data;
 
-        latestAlert = {
-            player: data?.data?.user?.username || "Unknown",
-            item: data?.data?.basket?.[0]?.name || "Item",
-            price: data?.data?.amount?.total_paid || 0
-        };
+    const price = d?.amount?.total_paid || 0;
 
-        console.log("Alert:", latestAlert);
-
-        res.sendStatus(200);
-    } catch (err) {
-        console.error(err);
-        res.sendStatus(500);
+    // pick tier
+    let tier = settings.tiers[0];
+    for (let t of settings.tiers) {
+        if (price >= t.min) tier = t;
     }
+
+    latestAlert = {
+        player: d?.user?.username || "Unknown",
+        item: d?.basket?.[0]?.name || "Item",
+        price,
+        gif: tier.gif,
+        sound: tier.sound,
+        color: tier.color
+    };
+
+    res.sendStatus(200);
 });
 
-// overlay page
-app.get("/", (req, res) => {
-    res.send(`
-<!DOCTYPE html>
-<html>
-<body style="margin:0;background:transparent;">
-<div id="alert" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:40px;color:white;background:rgba(0,0,0,0.7);padding:20px;border-radius:10px;display:none;"></div>
-
-<script>
-let last = "";
-
-async function load() {
-    const res = await fetch("/data");
-    const data = await res.json();
-
-    if (!data.player) return;
-
-    const str = JSON.stringify(data);
-    if (str === last) return;
-    last = str;
-
-    const box = document.getElementById("alert");
-    box.innerText = data.player + " bought " + data.item + " for " + data.price + " PLN";
-    box.style.display = "block";
-
-    setTimeout(() => box.style.display = "none", 5000);
-}
-
-setInterval(load, 1000);
-</script>
-</body>
-</html>
-`);
-});
-
-// data endpoint
+// data
 app.get("/data", (req, res) => {
     res.json(latestAlert || {});
+});
+
+// panel (simple API)
+app.post("/settings", (req, res) => {
+    settings = req.body;
+    res.sendStatus(200);
+});
+
+app.get("/settings", (req, res) => {
+    res.json(settings);
+});
+
+// overlay
+app.get("/", (req, res) => {
+    res.sendFile(__dirname + "/overlay.html");
+});
+
+// panel UI
+app.get("/panel", (req, res) => {
+    res.sendFile(__dirname + "/panel.html");
 });
 
 const PORT = process.env.PORT || 3000;
