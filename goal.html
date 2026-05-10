@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+
+<style>
+
+body {
+    margin:0;
+    background:transparent;
+    overflow:hidden;
+    font-family:Arial,sans-serif;
+}
+
+#container {
+    width:700px;
+    margin:20px auto;
+    text-align:center;
+}
+
+#title {
+    color:white;
+    font-size:42px;
+    font-weight:bold;
+    text-transform:uppercase;
+    text-shadow:0 0 12px black;
+    margin-bottom:10px;
+}
+
+#amounts {
+    color:white;
+    font-size:28px;
+    font-weight:bold;
+    text-shadow:0 0 10px black;
+    margin-bottom:10px;
+}
+
+#amounts span.green {
+    color:#4dff00;
+}
+
+#bar {
+    width:100%;
+    height:38px;
+    background:rgba(0,0,0,0.75);
+    border-radius:18px;
+    overflow:hidden;
+    border:2px solid rgba(255,255,255,0.1);
+}
+
+#progress {
+    height:100%;
+    width:0%;
+    border-radius:18px;
+
+    background:
+    repeating-linear-gradient(
+        45deg,
+        #37ff00,
+        #37ff00 15px,
+        #2ecc00 15px,
+        #2ecc00 30px
+    );
+
+    transition:width .8s ease;
+
+    box-shadow:
+        0 0 15px #37ff00,
+        inset 0 0 8px rgba(255,255,255,0.3);
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="container">
+
+    <div id="title">
+        NA SERWER MC
+    </div>
+
+    <div id="amounts">
+
+        <span id="current">
+            0
+        </span>
+
+        zł z
+
+        <span id="goal">
+            500
+        </span>
+
+        zł
+
+        <span class="green">
+            (
+            <span id="percent">0</span>
+            %
+            )
+        </span>
+
+    </div>
+
+    <div id="bar">
+        <div id="progress"></div>
+    </div>
+
+</div>
+
+<script>
+
+let settings = {
+    title:"NA SERWER MC",
+    current:0,
+    goal:500
+};
+
+async function loadSettings() {
+
+    try {
+
+        const res =
+            await fetch("/goal-config");
+
+        const data =
+            await res.json();
+
+        settings = data;
+
+        updateGoal();
+
+    } catch(e) {
+
+        console.error(e);
+
+    }
+}
+
+function updateGoal() {
+
+    document.getElementById("title")
+        .innerText = settings.title;
+
+    document.getElementById("current")
+        .innerText =
+        settings.current.toFixed(2);
+
+    document.getElementById("goal")
+        .innerText =
+        settings.goal.toFixed(2);
+
+    const percent =
+        Math.min(
+            (settings.current / settings.goal) * 100,
+            100
+        );
+
+    document.getElementById("percent")
+        .innerText =
+        percent.toFixed(2);
+
+    document.getElementById("progress")
+        .style.width =
+        percent + "%";
+}
+
+loadSettings();
+
+setInterval(loadSettings, 1000);
+
+</script>
+
+</body>
+</html>
