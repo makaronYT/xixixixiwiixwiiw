@@ -4,59 +4,61 @@
 
 <div id="alert" style="
 position:absolute;
-top:50%; left:50%;
+top:50%;
+left:50%;
 transform:translate(-50%,-50%) scale(0.8);
-text-align:center;
 opacity:0;
-transition: all 0.4s ease;
+transition:all .4s ease;
+text-align:center;
 ">
 
-<img id="gif" style="width:300px;"><br>
+<img id="gif" style="width:300px"><br>
 
 <div id="text" style="
-font-size:40px;
+font-size:42px;
 font-weight:bold;
-text-shadow: 0 0 20px black;
+text-shadow:0 0 20px black;
 "></div>
 
 </div>
 
-<audio id="sound"></audio>
-
 <script>
-let last = "";
+let lastId = null;
 
 async function load() {
     const res = await fetch("/data");
     const data = await res.json();
 
-    if (!data.player) return;
+    if (!data.id) return;
 
-    const id = JSON.stringify(data);
-    if (id === last) return;
-    last = id;
-
-    const box = document.getElementById("alert");
+    if (data.id === lastId) return;
+    lastId = data.id;
 
     document.getElementById("gif").src = data.gif;
-    document.getElementById("text").innerText =
-        `${data.player} donated ${data.price} PLN!`;
 
-    document.getElementById("text").style.color = data.color;
+    const text =
+        `${data.player} donated ${data.price} PLN`;
 
-    if (data.sound) {
-        const audio = document.getElementById("sound");
-        audio.src = data.sound;
-        audio.play();
-    }
+    const textEl = document.getElementById("text");
+
+    textEl.innerText = text;
+    textEl.style.color = data.color;
+
+    const box = document.getElementById("alert");
 
     box.style.opacity = "1";
     box.style.transform = "translate(-50%,-50%) scale(1)";
 
+    // TTS
+    if (data.tts) {
+        const utter = new SpeechSynthesisUtterance(text);
+        speechSynthesis.speak(utter);
+    }
+
     setTimeout(() => {
         box.style.opacity = "0";
         box.style.transform = "translate(-50%,-50%) scale(0.8)";
-    }, 6000);
+    }, data.duration || 5000);
 }
 
 setInterval(load, 1000);
