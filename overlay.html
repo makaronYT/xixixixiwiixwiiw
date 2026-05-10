@@ -25,6 +25,32 @@ text-shadow:0 0 20px black;
 <script>
 let lastId = null;
 
+async function playTTS(text) {
+    return new Promise((resolve) => {
+        const utter = new SpeechSynthesisUtterance(text);
+
+        utter.onend = () => resolve();
+
+        speechSynthesis.speak(utter);
+    });
+}
+
+async function playSound(url) {
+    return new Promise((resolve) => {
+        if (!url) return resolve();
+
+        const audio = new Audio(url);
+
+        audio.volume = 1;
+
+        audio.onended = () => resolve();
+
+        audio.onerror = () => resolve();
+
+        audio.play().catch(() => resolve());
+    });
+}
+
 async function load() {
     const res = await fetch("/data");
     const data = await res.json();
@@ -49,15 +75,18 @@ async function load() {
     box.style.opacity = "1";
     box.style.transform = "translate(-50%,-50%) scale(1)";
 
-    // TTS
+    // PLAY SOUND FIRST
+    await playSound(data.sound);
+
+    // THEN TTS
     if (data.tts) {
-        const utter = new SpeechSynthesisUtterance(text);
-        speechSynthesis.speak(utter);
+        await playTTS(text);
     }
 
     setTimeout(() => {
         box.style.opacity = "0";
-        box.style.transform = "translate(-50%,-50%) scale(0.8)";
+        box.style.transform =
+            "translate(-50%,-50%) scale(0.8)";
     }, data.duration || 5000);
 }
 
