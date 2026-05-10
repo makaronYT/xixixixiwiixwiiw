@@ -1,30 +1,46 @@
 <!DOCTYPE html>
 <html>
-<body style="font-family:sans-serif;padding:20px;">
+<body style="font-family:sans-serif;padding:20px">
 
-<h2>Donation Settings</h2>
+<h1>Donation Panel</h1>
 
-<textarea id="json" style="width:100%;height:300px;"></textarea><br><br>
+<textarea id="json" style="width:100%;height:400px"></textarea>
 
-<button onclick="save()">Save</button>
+<br><br>
+
+<button onclick="save()">Save Config</button>
+<button onclick="skip()">Skip Donation</button>
 
 <script>
 async function load() {
     const res = await fetch("/settings");
     const data = await res.json();
-    document.getElementById("json").value = JSON.stringify(data, null, 2);
+
+    document.getElementById("json").value =
+        JSON.stringify(data, null, 2);
 }
 
 async function save() {
-    const val = JSON.parse(document.getElementById("json").value);
+    const json =
+        JSON.parse(document.getElementById("json").value);
 
     await fetch("/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(val)
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify(json)
     });
 
     alert("Saved!");
+}
+
+async function skip() {
+    await fetch("/skip", {
+        method:"POST"
+    });
+
+    alert("Skipped!");
 }
 
 load();
