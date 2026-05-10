@@ -1,11 +1,6 @@
 <!DOCTYPE html>
 <html>
-<body style="
-margin:0;
-background:transparent;
-overflow:hidden;
-font-family:sans-serif;
-">
+<body style="margin:0;background:transparent;overflow:hidden;font-family:sans-serif;">
 
 <div id="alert" style="
 position:absolute;
@@ -28,102 +23,45 @@ text-shadow:0 0 20px black;
 </div>
 
 <script>
-
 let lastId = null;
 
-async function playTTS(text) {
-
-    return new Promise((resolve) => {
-
-        const utter =
-            new SpeechSynthesisUtterance(text);
-
-        utter.onend = () => resolve();
-
-        speechSynthesis.speak(utter);
-
-    });
-}
-
-async function playSound(url) {
-
-    return new Promise((resolve) => {
-
-        if (!url)
-            return resolve();
-
-        const audio = new Audio(url);
-
-        audio.volume = 1;
-
-        audio.onended = () => resolve();
-
-        audio.onerror = () => resolve();
-
-        audio.play()
-            .catch(() => resolve());
-
-    });
-}
-
 async function load() {
+    const res = await fetch("/data");
+    const data = await res.json();
 
-    const res =
-        await fetch("/data");
+    if (!data.id) return;
 
-    const data =
-        await res.json();
-
-    if (!data.id)
-        return;
-
-    if (data.id === lastId)
-        return;
-
+    if (data.id === lastId) return;
     lastId = data.id;
 
-    document.getElementById("gif").src =
-        data.gif;
+    document.getElementById("gif").src = data.gif;
 
     const text =
         `${data.player} donated ${data.price} PLN`;
 
-    const textEl =
-        document.getElementById("text");
+    const textEl = document.getElementById("text");
 
     textEl.innerText = text;
+    textEl.style.color = data.color;
 
-    textEl.style.color =
-        data.color;
-
-    const box =
-        document.getElementById("alert");
+    const box = document.getElementById("alert");
 
     box.style.opacity = "1";
+    box.style.transform = "translate(-50%,-50%) scale(1)";
 
-    box.style.transform =
-        "translate(-50%,-50%) scale(1)";
-
-    // SOUND FIRST
-    await playSound(data.sound);
-
-    // THEN TTS
+    // TTS
     if (data.tts) {
-        await playTTS(text);
+        const utter = new SpeechSynthesisUtterance(text);
+        speechSynthesis.speak(utter);
     }
 
     setTimeout(() => {
-
         box.style.opacity = "0";
-
-        box.style.transform =
-            "translate(-50%,-50%) scale(0.8)";
-
+        box.style.transform = "translate(-50%,-50%) scale(0.8)";
     }, data.duration || 5000);
 }
 
 setInterval(load, 1000);
-
 </script>
 
 </body>
