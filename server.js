@@ -2,9 +2,7 @@ const express = require("express");
 const fs = require("fs");
 
 const app = express();
-
 app.use(express.json());
-app.use(express.static(__dirname));
 
 let latestAlert = null;
 let alertTimeout = null;
@@ -12,10 +10,7 @@ let alertTimeout = null;
 const CONFIG_FILE = "config.txt";
 const LAST_FILE = "Lastdonates.txt";
 
-// =========================
-// DONATION SETTINGS
-// =========================
-
+// default config
 let settings = {
     tts: true,
     censor: true,
@@ -30,32 +25,15 @@ let settings = {
     ]
 };
 
-// =========================
-// GOAL CONFIG
-// =========================
-
-let goalConfig = {
-    title: "NA SERWER MC",
-    current: 5,
-    goal: 500
-};
-
-// =========================
-// LOAD CONFIG
-// =========================
-
+// load config if exists
 if (fs.existsSync(CONFIG_FILE)) {
     settings = JSON.parse(fs.readFileSync(CONFIG_FILE));
 }
 
-// =========================
-// BAD WORDS
-// =========================
-
+// bad words
 const badWords = [
     // english
     "fuck","bitch","nigger","shit","asshole",
-
     // polish
     "kurwa","chuj","jebać","pizda","skurwysyn"
 ];
@@ -73,10 +51,7 @@ function censorText(text) {
     return output;
 }
 
-// =========================
-// SAVE HISTORY
-// =========================
-
+// save donation history
 function saveLastDonate(data) {
     const line =
         `[${new Date().toISOString()}] ${data.player} | ${data.price} PLN | ${data.item}\n`;
@@ -84,12 +59,8 @@ function saveLastDonate(data) {
     fs.appendFileSync(LAST_FILE, line);
 }
 
-// =========================
-// WEBHOOK
-// =========================
-
+// webhook
 app.post("/webhook", (req, res) => {
-
     const d = req.body?.data;
 
     const price = d?.amount?.total_paid || 0;
@@ -100,11 +71,8 @@ app.post("/webhook", (req, res) => {
         if (price >= t.min) tier = t;
     }
 
-    const player =
-        censorText(d?.user?.username || "Unknown");
-
-    const item =
-        censorText(d?.basket?.[0]?.name || "Item");
+    const player = censorText(d?.user?.username || "Unknown");
+    const item = censorText(d?.basket?.[0]?.name || "Item");
 
     latestAlert = {
         id: Date.now(),
@@ -118,104 +86,69 @@ app.post("/webhook", (req, res) => {
         tts: settings.tts
     };
 
-    // ADD TO GOAL
-    goalConfig.current += price;
+    // clear previous timer
+    if (alertTimeout) clearTimeout(alertTimeout);
 
-    if (alertTimeout)
-        clearTimeout(alertTimeout);
-
+    // auto archive + clear
     alertTimeout = setTimeout(() => {
-
         saveLastDonate(latestAlert);
-
         latestAlert = null;
-
     }, tier.duration);
 
     res.sendStatus(200);
 });
 
-// =========================
-// ALERT DATA
-// =========================
-
+// current donation
 app.get("/data", (req, res) => {
     res.json(latestAlert || {});
 });
 
-// =========================
-// LAST DONATIONS
-// =========================
-
+// last donations txt
 app.get("/lastdonos", (req, res) => {
-
     if (!fs.existsSync(LAST_FILE)) {
         return res.send("No donations yet");
     }
 
     res.type("text/plain");
-
-    res.send(
-        fs.readFileSync(LAST_FILE, "utf8")
-    );
+    res.send(fs.readFileSync(LAST_FILE, "utf8"));
 });
 
-// =========================
-// SKIP ALERT
-// =========================
-
+// skip donation
 app.post("/skip", (req, res) => {
-
     if (latestAlert) {
         saveLastDonate(latestAlert);
     }
 
     latestAlert = null;
 
-    if (alertTimeout)
-        clearTimeout(alertTimeout);
+    if (alertTimeout) clearTimeout(alertTimeout);
 
     res.sendStatus(200);
 });
 
-// =========================
-// SETTINGS SAVE
-// =========================
-
+// settings save
 app.post("/settings", (req, res) => {
-
     settings = req.body;
 
-    fs.writeFileSync(
-        CONFIG_FILE,
-        JSON.stringify(settings, null, 2)
-    );
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(settings, null, 2));
 
     res.sendStatus(200);
 });
 
+// settings load
 app.get("/settings", (req, res) => {
     res.json(settings);
 });
 
-// =========================
-// GOAL CONFIG API
-// =========================
-
-app.get("/goal-config", (req, res) => {
-    res.json(goalConfig);
+// overlay
+app.get("/", (req, res) => {
+    res.sendFile(__dirname + "/overlay.html");
 });
 
-app.post("/goal-config", (req, res) => {
-
-    goalConfig = req.body;
-
-    res.sendStatus(200);
+// panel
+app.get("/panel", (req, res) => {
+    res.sendFile(__dirname + "/panel.html");
 });
-
-// =========================
-// START
-// =========================
 
 const PORT = process.env.PORT || 3000;
 
