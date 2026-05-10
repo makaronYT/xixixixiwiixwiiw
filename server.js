@@ -4,21 +4,32 @@ const fs = require("fs");
 const app = express();
 
 app.use(express.json());
+app.use(express.text());
 app.use(express.static(__dirname));
+
+// =========================
+// FILES
+// =========================
+
+const CONFIG_FILE = "config.txt";
+const LAST_FILE = "Lastdonates.txt";
+const CENSOR_FILE = "censor.txt";
+
+// =========================
+// MEMORY
+// =========================
 
 let latestAlert = null;
 let alertTimeout = null;
 
-const CONFIG_FILE = "config.txt";
-const LAST_FILE = "Lastdonates.txt";
-
 // =========================
-// DONATION SETTINGS
+// SETTINGS
 // =========================
 
 let settings = {
     tts: true,
     censor: true,
+
     tiers: [
         {
             min: 0,
@@ -36,7 +47,7 @@ let settings = {
 
 let goalConfig = {
     title: "NA SERWER MC",
-    current: 5,
+    current: 0,
     goal: 500
 };
 
@@ -45,25 +56,29 @@ let goalConfig = {
 // =========================
 
 if (fs.existsSync(CONFIG_FILE)) {
-    settings = JSON.parse(fs.readFileSync(CONFIG_FILE));
+
+    settings =
+        JSON.parse(
+            fs.readFileSync(CONFIG_FILE)
+        );
 }
 
 // =========================
-// BAD WORDS
+// CREATE CENSOR FILE
 // =========================
 
-// =========================
-// CENSOR PANEL
-// =========================
-
-const CENSOR_FILE = "censor.txt";
-
-// create file if missing
 if (!fs.existsSync(CENSOR_FILE)) {
-    fs.writeFileSync(CENSOR_FILE, "badword");
+
+    fs.writeFileSync(
+        CENSOR_FILE,
+        "badword"
+    );
 }
 
-// load words
+// =========================
+// LOAD BAD WORDS
+// =========================
+
 function getBadWords() {
 
     return fs
@@ -73,7 +88,10 @@ function getBadWords() {
         .filter(Boolean);
 }
 
-// use loaded words
+// =========================
+// CENSOR TEXT
+// =========================
+
 function censorText(text) {
 
     if (!text) return "";
@@ -94,7 +112,220 @@ function censorText(text) {
     return output;
 }
 
-// GET words
+// =========================
+// SAVE HISTORY
+// =========================
+
+function saveLastDonate(data) {
+
+    if (!data) return;
+
+    const line =
+        `[${new Date().toISOString()}] ` +
+        `${data.player} | ` +
+        `${data.price} PLN | ` +
+        `${data.item}\n`;
+
+    fs.appendFileSync(
+        LAST_FILE,
+        line
+    );
+}
+
+// =========================
+// WEBHOOK
+// =========================
+
+app.post("/webhook", (req, res) => {
+
+    try {
+
+        const d = req.body?.data;
+
+        const price =
+            d?.amount?.total_paid || 0;
+
+        let tier =
+            settings.tiers[0];
+
+        for (const t of settings.tiers) {
+
+            if (price >= t.min)
+                tier = t;
+        }
+
+        let player =
+            d?.user?.username || "Unknown";
+
+        let item =
+            d?.basket?.[0]?.name || "Item";
+
+        // censor
+        if (settings.censor) {
+
+            player =
+                censorText(player);
+
+            item =
+                censorText(item);
+        }
+
+        latestAlert = {
+
+            id: Date.now(),
+
+            player,
+            item,
+            price,
+
+            gif: tier.gif,
+            sound: tier.sound,
+            color: tier.color,
+
+            duration: tier.duration,
+
+            tts: settings.tts
+        };
+
+        // ADD TO GOAL
+        goalConfig.current += price;
+
+        // clear old timeout
+        if (alertTimeout)
+            clearTimeout(alertTimeout);
+
+        // auto clear alert
+        alertTimeout = setTimeout(() => {
+
+            saveLastDonate(latestAlert);
+
+            latestAlert = null;
+
+        }, tier.duration);
+
+        res.sendStatus(200);
+
+    } catch (err) {
+
+        console.error(err);
+
+        res.sendStatus(500);
+    }
+});
+
+// =========================
+// ALERT DATA
+// =========================
+
+app.get("/data", (req, res) => {
+
+    res.json(
+        latestAlert || {}
+    );
+});
+
+// =========================
+// LAST DONATIONS
+// =========================
+
+app.get("/lastdonos", (req, res) => {
+
+    if (!fs.existsSync(LAST_FILE)) {
+
+        return res.send(
+            "No donations yet"
+        );
+    }
+
+    res.type("text/plain");
+
+    res.send(
+        fs.readFileSync(
+            LAST_FILE,
+            "utf8"
+        )
+    );
+});
+
+// =========================
+// SKIP ALERT
+// =========================
+
+app.post("/skip", (req, res) => {
+
+    if (latestAlert) {
+
+        saveLastDonate(
+            latestAlert
+        );
+    }
+
+    latestAlert = null;
+
+    if (alertTimeout)
+        clearTimeout(alertTimeout);
+
+    res.sendStatus(200);
+});
+
+// =========================
+// SETTINGS API
+// =========================
+
+app.get("/settings", (req, res) => {
+
+    res.json(settings);
+});
+
+app.post("/settings", (req, res) => {
+
+    settings = req.body;
+
+    fs.writeFileSync(
+
+        CONFIG_FILE,
+
+        JSON.stringify(
+            settings,
+            null,
+            2
+        )
+    );
+
+    res.sendStatus(200);
+});
+
+// =========================
+// PANEL PAGE
+// =========================
+
+app.get("/panel", (req, res) => {
+
+    res.sendFile(
+        __dirname + "/panel.html"
+    );
+});
+
+// =========================
+// GOAL CONFIG API
+// =========================
+
+app.get("/goal-config", (req, res) => {
+
+    res.json(goalConfig);
+});
+
+app.post("/goal-config", (req, res) => {
+
+    goalConfig = req.body;
+
+    res.sendStatus(200);
+});
+
+// =========================
+// CENSOR PANEL
+// =========================
+
 app.get("/censor", (req, res) => {
 
     res.send(`
@@ -178,21 +409,29 @@ load();
 `);
 });
 
-// GET censor file
+// =========================
+// CENSOR DATA
+// =========================
+
 app.get("/censor-data", (req, res) => {
 
     res.type("text/plain");
 
     res.send(
-        fs.readFileSync(CENSOR_FILE, "utf8")
+
+        fs.readFileSync(
+            CENSOR_FILE,
+            "utf8"
+        )
     );
 });
 
-// SAVE censor file
 app.post("/censor-data", (req, res) => {
 
     fs.writeFileSync(
+
         CENSOR_FILE,
+
         req.body
     );
 
@@ -200,150 +439,15 @@ app.post("/censor-data", (req, res) => {
 });
 
 // =========================
-// SAVE HISTORY
-// =========================
-
-function saveLastDonate(data) {
-    const line =
-        `[${new Date().toISOString()}] ${data.player} | ${data.price} PLN | ${data.item}\n`;
-
-    fs.appendFileSync(LAST_FILE, line);
-}
-
-// =========================
-// WEBHOOK
-// =========================
-
-app.post("/webhook", (req, res) => {
-
-    const d = req.body?.data;
-
-    const price = d?.amount?.total_paid || 0;
-
-    let tier = settings.tiers[0];
-
-    for (const t of settings.tiers) {
-        if (price >= t.min) tier = t;
-    }
-
-    const player =
-        censorText(d?.user?.username || "Unknown");
-
-    const item =
-        censorText(d?.basket?.[0]?.name || "Item");
-
-    latestAlert = {
-        id: Date.now(),
-        player,
-        item,
-        price,
-        gif: tier.gif,
-        sound: tier.sound,
-        color: tier.color,
-        duration: tier.duration,
-        tts: settings.tts
-    };
-
-    // ADD TO GOAL
-    goalConfig.current += price;
-
-    if (alertTimeout)
-        clearTimeout(alertTimeout);
-
-    alertTimeout = setTimeout(() => {
-
-        saveLastDonate(latestAlert);
-
-        latestAlert = null;
-
-    }, tier.duration);
-
-    res.sendStatus(200);
-});
-
-// =========================
-// ALERT DATA
-// =========================
-
-app.get("/data", (req, res) => {
-    res.json(latestAlert || {});
-});
-
-// =========================
-// LAST DONATIONS
-// =========================
-
-app.get("/lastdonos", (req, res) => {
-
-    if (!fs.existsSync(LAST_FILE)) {
-        return res.send("No donations yet");
-    }
-
-    res.type("text/plain");
-
-    res.send(
-        fs.readFileSync(LAST_FILE, "utf8")
-    );
-});
-
-// =========================
-// SKIP ALERT
-// =========================
-
-app.post("/skip", (req, res) => {
-
-    if (latestAlert) {
-        saveLastDonate(latestAlert);
-    }
-
-    latestAlert = null;
-
-    if (alertTimeout)
-        clearTimeout(alertTimeout);
-
-    res.sendStatus(200);
-});
-
-// =========================
-// SETTINGS SAVE
-// =========================
-
-app.post("/settings", (req, res) => {
-
-    settings = req.body;
-
-    fs.writeFileSync(
-        CONFIG_FILE,
-        JSON.stringify(settings, null, 2)
-    );
-
-    res.sendStatus(200);
-});
-
-app.get("/settings", (req, res) => {
-    res.json(settings);
-});
-
-// =========================
-// GOAL CONFIG API
-// =========================
-
-app.get("/goal-config", (req, res) => {
-    res.json(goalConfig);
-});
-
-app.post("/goal-config", (req, res) => {
-
-    goalConfig = req.body;
-
-    res.sendStatus(200);
-});
-// =========================
 // START
 // =========================
 
-const PORT = process.env.PORT || 3000;
+const PORT =
+    process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log("Running on " + PORT);
+
+    console.log(
+        "Running on " + PORT
+    );
 });
