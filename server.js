@@ -52,26 +52,152 @@ if (fs.existsSync(CONFIG_FILE)) {
 // BAD WORDS
 // =========================
 
-const badWords = [
-    // english
-    "fuck","bitch","nigger","shit","asshole",
+// =========================
+// CENSOR PANEL
+// =========================
 
-    // polish
-    "kurwa","chuj","jebać","pizda","skurwysyn"
-];
+const CENSOR_FILE = "censor.txt";
 
+// create file if missing
+if (!fs.existsSync(CENSOR_FILE)) {
+    fs.writeFileSync(CENSOR_FILE, "badword");
+}
+
+// load words
+function getBadWords() {
+
+    return fs
+        .readFileSync(CENSOR_FILE, "utf8")
+        .split("\n")
+        .map(w => w.trim())
+        .filter(Boolean);
+}
+
+// use loaded words
 function censorText(text) {
+
     if (!text) return "";
 
     let output = text;
 
-    for (const word of badWords) {
-        const regex = new RegExp(word, "gi");
-        output = output.replace(regex, "****");
+    const words = getBadWords();
+
+    for (const word of words) {
+
+        const regex =
+            new RegExp(word, "gi");
+
+        output =
+            output.replace(regex, "****");
     }
 
     return output;
 }
+
+// GET words
+app.get("/censor", (req, res) => {
+
+    res.send(`
+<!DOCTYPE html>
+<html>
+
+<body style="
+font-family:sans-serif;
+padding:20px;
+background:#111;
+color:white;
+">
+
+<h1>Censor Words</h1>
+
+<p>
+One word per line
+</p>
+
+<textarea id="words" style="
+width:100%;
+height:400px;
+background:#222;
+color:white;
+font-size:18px;
+padding:10px;
+"></textarea>
+
+<br><br>
+
+<button onclick="save()" style="
+font-size:20px;
+padding:10px 20px;
+cursor:pointer;
+">
+Save
+</button>
+
+<script>
+
+async function load() {
+
+    const res =
+        await fetch("/censor-data");
+
+    const txt =
+        await res.text();
+
+    document
+        .getElementById("words")
+        .value = txt;
+}
+
+async function save() {
+
+    const words =
+        document
+        .getElementById("words")
+        .value;
+
+    await fetch("/censor-data", {
+
+        method:"POST",
+
+        headers:{
+            "Content-Type":"text/plain"
+        },
+
+        body:words
+    });
+
+    alert("Saved!");
+}
+
+load();
+
+</script>
+
+</body>
+</html>
+`);
+});
+
+// GET censor file
+app.get("/censor-data", (req, res) => {
+
+    res.type("text/plain");
+
+    res.send(
+        fs.readFileSync(CENSOR_FILE, "utf8")
+    );
+});
+
+// SAVE censor file
+app.post("/censor-data", (req, res) => {
+
+    fs.writeFileSync(
+        CENSOR_FILE,
+        req.body
+    );
+
+    res.sendStatus(200);
+});
 
 // =========================
 // SAVE HISTORY
